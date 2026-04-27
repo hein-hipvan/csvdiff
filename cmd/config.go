@@ -25,6 +25,7 @@ type Context struct {
 	recordCount            int
 	separator              rune
 	lazyQuotes             bool
+	normalizeNumeric       bool
 }
 
 // NewContext can take all CLI flags and create a cmd.Context
@@ -41,6 +42,7 @@ func NewContext(
 	deltaFilename string,
 	separator rune,
 	lazyQuotes bool,
+	normalizeNumeric bool,
 ) (*Context, error) {
 	baseRecordCount, err := getColumnsCount(fs, baseFilename, separator, lazyQuotes)
 	if err != nil {
@@ -84,6 +86,7 @@ func NewContext(
 		recordCount:            baseRecordCount,
 		separator:              separator,
 		lazyQuotes:             lazyQuotes,
+		normalizeNumeric:       normalizeNumeric,
 	}
 
 	if err := ctx.validate(); err != nil {
@@ -205,12 +208,13 @@ func getColumnsCount(fs afero.Fs, filename string, separator rune, lazyQuotes bo
 // that is needed to start the diff process
 func (c *Context) BaseDigestConfig() (digest.Config, error) {
 	return digest.Config{
-		Reader:     c.baseFile,
-		Value:      c.valueColumnPositions,
-		Key:        c.primaryKeyPositions,
-		Include:    c.includeColumnPositions,
-		Separator:  c.separator,
-		LazyQuotes: c.lazyQuotes,
+		Reader:           c.baseFile,
+		Value:            c.valueColumnPositions,
+		Key:              c.primaryKeyPositions,
+		Include:          c.includeColumnPositions,
+		Separator:        c.separator,
+		LazyQuotes:       c.lazyQuotes,
+		NormalizeNumeric: c.normalizeNumeric,
 	}, nil
 }
 
@@ -218,12 +222,13 @@ func (c *Context) BaseDigestConfig() (digest.Config, error) {
 // that is needed to start the diff process
 func (c *Context) DeltaDigestConfig() (digest.Config, error) {
 	return digest.Config{
-		Reader:     c.deltaFile,
-		Value:      c.valueColumnPositions,
-		Key:        c.primaryKeyPositions,
-		Include:    c.includeColumnPositions,
-		Separator:  c.separator,
-		LazyQuotes: c.lazyQuotes,
+		Reader:           c.deltaFile,
+		Value:            c.valueColumnPositions,
+		Key:              c.primaryKeyPositions,
+		Include:          c.includeColumnPositions,
+		Separator:        c.separator,
+		LazyQuotes:       c.lazyQuotes,
+		NormalizeNumeric: c.normalizeNumeric,
 	}, nil
 }
 

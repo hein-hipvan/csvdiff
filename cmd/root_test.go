@@ -44,6 +44,7 @@ func TestRunContext(t *testing.T) {
 			"/delta.csv",
 			',',
 			false,
+			false,
 		)
 		assert.NoError(t, err)
 

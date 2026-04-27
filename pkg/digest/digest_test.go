@@ -21,7 +21,7 @@ func TestCreateDigestWithSource(t *testing.T) {
 		Source: strings.Split(firstLine, comma),
 	}
 
-	actualDigest := digest.CreateDigest(strings.Split(firstLine, comma), comma, []int{0}, []int{})
+	actualDigest := digest.CreateDigest(strings.Split(firstLine, comma), comma, []int{0}, []int{}, false)
 
 	assert.Equal(t, expectedDigest, actualDigest)
 }
@@ -87,6 +87,32 @@ func TestDigestForFile(t *testing.T) {
 	})
 }
 
+func TestCreateDigest_NumericNormalization(t *testing.T) {
+	baseLine := strings.Split("1,0", comma)
+	deltaLine := strings.Split("1,0.0", comma)
+
+	t.Run("same value hash when normalizeNumeric is true", func(t *testing.T) {
+		base := digest.CreateDigest(baseLine, comma, []int{0}, []int{1}, true)
+		delta := digest.CreateDigest(deltaLine, comma, []int{0}, []int{1}, true)
+
+		assert.Equal(t, base.Key, delta.Key)
+		assert.Equal(t, base.Value, delta.Value, "'0' and '0.0' should hash equally when normalized")
+	})
+
+	t.Run("different value hash when normalizeNumeric is false", func(t *testing.T) {
+		base := digest.CreateDigest(baseLine, comma, []int{0}, []int{1}, false)
+		delta := digest.CreateDigest(deltaLine, comma, []int{0}, []int{1}, false)
+
+		assert.Equal(t, base.Key, delta.Key)
+		assert.NotEqual(t, base.Value, delta.Value, "raw '0' and '0.0' should hash differently by default")
+	})
+
+	t.Run("source slice preserves original cells", func(t *testing.T) {
+		delta := digest.CreateDigest(deltaLine, comma, []int{0}, []int{1}, true)
+		assert.Equal(t, deltaLine, delta.Source)
+	})
+}
+
 func TestNewConfig(t *testing.T) {
 	r := strings.NewReader("a,csv,as,str")
 	primaryColumns := digest.Positions{0}
@@ -94,28 +120,30 @@ func TestNewConfig(t *testing.T) {
 	include := digest.Positions{0, 1}
 
 	t.Run("should create config from given params", func(t *testing.T) {
-		conf := digest.NewConfig(r, primaryColumns, values, include, ',', false)
+		conf := digest.NewConfig(r, primaryColumns, values, include, ',', false, false)
 		expectedConf := digest.Config{
-			Reader:     r,
-			Key:        primaryColumns,
-			Value:      values,
-			Include:    include,
-			Separator:  ',',
-			LazyQuotes: false,
+			Reader:           r,
+			Key:              primaryColumns,
+			Value:            values,
+			Include:          include,
+			Separator:        ',',
+			LazyQuotes:       false,
+			NormalizeNumeric: false,
 		}
 
 		assert.Equal(t, expectedConf, *conf)
 	})
 
 	t.Run("should use valueColumns as includeColumns for includes not specified", func(t *testing.T) {
-		conf := digest.NewConfig(r, primaryColumns, values, nil, ',', false)
+		conf := digest.NewConfig(r, primaryColumns, values, nil, ',', false, false)
 		expectedConf := digest.Config{
-			Reader:     r,
-			Key:        primaryColumns,
-			Value:      values,
-			Include:    values,
-			Separator:  ',',
-			LazyQuotes: false,
+			Reader:           r,
+			Key:              primaryColumns,
+			Value:            values,
+			Include:          values,
+			Separator:        ',',
+			LazyQuotes:       false,
+			NormalizeNumeric: false,
 		}
 
 		assert.Equal(t, expectedConf, *conf)

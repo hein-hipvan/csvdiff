@@ -115,4 +115,48 @@ func TestDiff(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, expected, actual)
 	})
+
+	t.Run("numeric normalization treats 0 and 0.0 as equal", func(t *testing.T) {
+		baseCSV := "1,0\n2,hello\n3, -0.00 \n"
+		deltaCSV := "1,0.0\n2,hello\n3,0\n"
+
+		baseConfig := &digest.Config{
+			Reader:           strings.NewReader(baseCSV),
+			Key:              []int{0},
+			Separator:        ',',
+			NormalizeNumeric: true,
+		}
+		deltaConfig := &digest.Config{
+			Reader:           strings.NewReader(deltaCSV),
+			Key:              []int{0},
+			Separator:        ',',
+			NormalizeNumeric: true,
+		}
+
+		actual, err := digest.Diff(*baseConfig, *deltaConfig)
+		assert.NoError(t, err)
+		assert.Empty(t, actual.Additions)
+		assert.Empty(t, actual.Deletions)
+		assert.Empty(t, actual.Modifications, "numerically-equal rows should not be reported as modifications")
+	})
+
+	t.Run("numeric normalization off reports 0 vs 0.0 as modification", func(t *testing.T) {
+		baseCSV := "1,0\n"
+		deltaCSV := "1,0.0\n"
+
+		baseConfig := &digest.Config{
+			Reader:    strings.NewReader(baseCSV),
+			Key:       []int{0},
+			Separator: ',',
+		}
+		deltaConfig := &digest.Config{
+			Reader:    strings.NewReader(deltaCSV),
+			Key:       []int{0},
+			Separator: ',',
+		}
+
+		actual, err := digest.Diff(*baseConfig, *deltaConfig)
+		assert.NoError(t, err)
+		assert.Len(t, actual.Modifications, 1, "default behavior should still flag the difference")
+	})
 }

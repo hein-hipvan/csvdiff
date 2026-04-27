@@ -17,12 +17,42 @@ type Digest struct {
 }
 
 // CreateDigest creates a Digest for each line of csv.
-// There will be one Digest per line
-func CreateDigest(csv []string, separator string, pKey Positions, pRow Positions) Digest {
+// There will be one Digest per line.
+//
+// When normalizeNumeric is true, cells used in the row digest are
+// canonicalized via normalizeNumericValue before hashing so that
+// numerically-equal strings (e.g. "0" and "0.0") produce the same value
+// hash. The primary-key hash and the returned Source slice always use
+// the original, unmodified cells.
+func CreateDigest(csv []string, separator string, pKey Positions, pRow Positions, normalizeNumeric bool) Digest {
 	key := xxhash.Sum64String(pKey.Join(csv, separator))
-	digest := xxhash.Sum64String(pRow.Join(csv, separator))
+
+	rowCells := csv
+	if normalizeNumeric {
+		rowCells = normalizedCellsForRow(csv, pRow)
+	}
+	digest := xxhash.Sum64String(pRow.Join(rowCells, separator))
 
 	return Digest{Key: key, Value: digest, Source: csv}
+}
+
+// normalizedCellsForRow returns a shallow copy of csv with cells at the
+// row-digest positions replaced by their numeric-canonical form. When
+// pRow is empty, every cell is normalized (mirroring Positions.Join's
+// "all columns" semantics for an empty Positions).
+func normalizedCellsForRow(csv []string, pRow Positions) []string {
+	out := make([]string, len(csv))
+	copy(out, csv)
+	if len(pRow) == 0 {
+		for i := range out {
+			out[i] = normalizeNumericValue(out[i])
+		}
+		return out
+	}
+	for _, pos := range pRow {
+		out[pos] = normalizeNumericValue(out[pos])
+	}
+	return out
 }
 
 const bufferSize = 512
@@ -89,7 +119,7 @@ func createDigestForNLines(lines [][]string,
 	output := make([]Digest, len(lines))
 	separator := string(config.Separator)
 	for i, line := range lines {
-		output[i] = CreateDigest(line, separator, config.Key, config.Value)
+		output[i] = CreateDigest(line, separator, config.Key, config.Value, config.NormalizeNumeric)
 	}
 
 	digestChannel <- output

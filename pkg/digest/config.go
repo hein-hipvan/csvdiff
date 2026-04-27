@@ -8,13 +8,16 @@ import "io"
 // Key: The primary key positions
 // Value: The Value positions that needs to be compared for diff
 // Include: Include these positions in output. It is Value positions by default.
+// NormalizeNumeric: When true, numerically-equal value cells hash equally
+// (e.g. "0" == "0.0"). Primary-key cells are unaffected.
 type Config struct {
-	Key         Positions
-	Value       Positions
-	Include     Positions
-	Reader      io.Reader
-	Separator   rune
-	LazyQuotes  bool
+	Key              Positions
+	Value            Positions
+	Include          Positions
+	Reader           io.Reader
+	Separator        rune
+	LazyQuotes       bool
+	NormalizeNumeric bool
 }
 
 // NewConfig creates an instance of Config struct.
@@ -25,17 +28,19 @@ func NewConfig(
 	includeColumns Positions,
 	separator rune,
 	lazyQuotes bool,
+	normalizeNumeric bool,
 ) *Config {
 	if len(includeColumns) == 0 {
 		includeColumns = valueColumns
 	}
 
 	return &Config{
-		Reader:     r,
-		Key:        primaryKey,
-		Value:      valueColumns,
-		Include:    includeColumns,
-		Separator:  separator,
-		LazyQuotes: lazyQuotes,
+		Reader:           r,
+		Key:              primaryKey,
+		Value:            valueColumns,
+		Include:          includeColumns,
+		Separator:        separator,
+		LazyQuotes:       lazyQuotes,
+		NormalizeNumeric: normalizeNumeric,
 	}
 }

@@ -77,6 +77,7 @@ Most suitable for csv files created from database tables`,
 			deltaFilename,
 			runeSeparator,
 			lazyQuotes,
+			numericNormalize,
 		)
 
 		if err != nil {
@@ -127,6 +128,7 @@ var (
 	format                     string
 	separator                  string
 	lazyQuotes                 bool
+	numericNormalize           bool
 )
 
 func init() {
@@ -141,6 +143,7 @@ func init() {
 
 	rootCmd.Flags().BoolVarP(&timed, "time", "", false, "Measure time")
 	rootCmd.Flags().BoolVar(&lazyQuotes, "lazyquotes", false, "allow unescaped quotes")
+	rootCmd.Flags().BoolVar(&numericNormalize, "numeric", false, "treat numerically-equal values as the same (e.g. 0 == 0.0); applies to value columns only")
 }
 
 func timeTrack(start time.Time, name string) {
