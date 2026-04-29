@@ -26,6 +26,7 @@ type Context struct {
 	separator              rune
 	lazyQuotes             bool
 	normalizeNumeric       bool
+	equivalences           *digest.Equivalences
 }
 
 // NewContext can take all CLI flags and create a cmd.Context
@@ -43,6 +44,8 @@ func NewContext(
 	separator rune,
 	lazyQuotes bool,
 	normalizeNumeric bool,
+	equalGroupsRaw []string,
+	equalIgnoreCase bool,
 ) (*Context, error) {
 	baseRecordCount, err := getColumnsCount(fs, baseFilename, separator, lazyQuotes)
 	if err != nil {
@@ -87,6 +90,7 @@ func NewContext(
 		separator:              separator,
 		lazyQuotes:             lazyQuotes,
 		normalizeNumeric:       normalizeNumeric,
+		equivalences:           digest.NewEquivalences(parseEqualGroups(equalGroupsRaw), equalIgnoreCase),
 	}
 
 	if err := ctx.validate(); err != nil {
@@ -215,6 +219,7 @@ func (c *Context) BaseDigestConfig() (digest.Config, error) {
 		Separator:        c.separator,
 		LazyQuotes:       c.lazyQuotes,
 		NormalizeNumeric: c.normalizeNumeric,
+		Equivalences:     c.equivalences,
 	}, nil
 }
 
@@ -229,7 +234,22 @@ func (c *Context) DeltaDigestConfig() (digest.Config, error) {
 		Separator:        c.separator,
 		LazyQuotes:       c.lazyQuotes,
 		NormalizeNumeric: c.normalizeNumeric,
+		Equivalences:     c.equivalences,
 	}, nil
+}
+
+// parseEqualGroups splits each raw --equal flag value on "," to build
+// equivalence groups. No trimming is applied so empty-string members
+// (from a trailing comma) are preserved as legitimate matchable values.
+func parseEqualGroups(raw []string) [][]string {
+	if len(raw) == 0 {
+		return nil
+	}
+	groups := make([][]string, 0, len(raw))
+	for _, g := range raw {
+		groups = append(groups, strings.Split(g, ","))
+	}
+	return groups
 }
 
 // Close all file handles

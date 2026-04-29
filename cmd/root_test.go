@@ -45,6 +45,8 @@ func TestRunContext(t *testing.T) {
 			',',
 			false,
 			false,
+			nil,
+			false,
 		)
 		assert.NoError(t, err)
 
@@ -70,5 +72,49 @@ func TestRunContext(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, expected, outStream.String())
 
+	})
+
+	t.Run("--equal collapses equivalent values into a no-op modification", func(t *testing.T) {
+		fs := afero.NewMemMapFs()
+		baseContent := []byte(`id,name,note
+1,alice,N/A
+2,bob,seen
+`)
+		deltaContent := []byte(`id,name,note
+1,alice,null
+2,bob,seen
+`)
+		assert.NoError(t, afero.WriteFile(fs, "/base.csv", baseContent, os.ModePerm))
+		assert.NoError(t, afero.WriteFile(fs, "/delta.csv", deltaContent, os.ModePerm))
+
+		ctx, err := NewContext(
+			fs,
+			digest.Positions{0},
+			digest.Positions{1, 2},
+			nil,
+			digest.Positions{0, 1, 2},
+			"json",
+			"/base.csv",
+			"/delta.csv",
+			',',
+			false,
+			false,
+			[]string{"N/A,null,"},
+			false,
+		)
+		assert.NoError(t, err)
+
+		outStream := &bytes.Buffer{}
+		errStream := &bytes.Buffer{}
+
+		err = runContext(ctx, outStream, errStream)
+		assert.NoError(t, err)
+
+		expected := `{
+  "Additions": [],
+  "Modifications": [],
+  "Deletions": []
+}`
+		assert.Equal(t, expected, outStream.String())
 	})
 }

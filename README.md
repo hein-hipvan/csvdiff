@@ -131,6 +131,19 @@ There are a number of formats supported
 % csvdiff base.csv delta.csv --primary-key 0,1 --columns 2
 ```
 
+- Treat user-defined values as equal during comparison. Pass `--equal` once per group of mutually-equal values; repeat the flag for additional groups. The first member of a group is the canonical form. Empty strings can be included via a trailing comma. Only value columns are affected — primary-key columns are never canonicalized.
+
+```bash
+# Treat N/A, null, and empty string as the same value
+% csvdiff base.csv delta.csv --equal "N/A,null,"
+
+# Multiple groups in one run
+% csvdiff base.csv delta.csv --equal "N/A,null," --equal "yes,1,true"
+
+# Case-insensitive matching across all groups
+% csvdiff base.csv delta.csv --equal "N/A,null," --equal-ignore-case
+```
+
 - Supports JSON format for post processing
 
 ```bash

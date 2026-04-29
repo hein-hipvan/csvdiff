@@ -159,4 +159,53 @@ func TestDiff(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Len(t, actual.Modifications, 1, "default behavior should still flag the difference")
 	})
+
+	t.Run("equivalence groups treat user-defined values as equal", func(t *testing.T) {
+		baseCSV := "1,N/A\n2,seen\n"
+		deltaCSV := "1,null\n2,seen\n"
+		eq := digest.NewEquivalences([][]string{{"N/A", "null", ""}}, false)
+
+		baseConfig := &digest.Config{
+			Reader:       strings.NewReader(baseCSV),
+			Key:          []int{0},
+			Separator:    ',',
+			Equivalences: eq,
+		}
+		deltaConfig := &digest.Config{
+			Reader:       strings.NewReader(deltaCSV),
+			Key:          []int{0},
+			Separator:    ',',
+			Equivalences: eq,
+		}
+
+		actual, err := digest.Diff(*baseConfig, *deltaConfig)
+		assert.NoError(t, err)
+		assert.Empty(t, actual.Additions)
+		assert.Empty(t, actual.Deletions)
+		assert.Empty(t, actual.Modifications, "values in same equivalence group should not be reported as modifications")
+	})
+
+	t.Run("equivalence does not affect primary keys", func(t *testing.T) {
+		baseCSV := "N/A,row\n"
+		deltaCSV := "null,row\n"
+		eq := digest.NewEquivalences([][]string{{"N/A", "null"}}, false)
+
+		baseConfig := &digest.Config{
+			Reader:       strings.NewReader(baseCSV),
+			Key:          []int{0},
+			Separator:    ',',
+			Equivalences: eq,
+		}
+		deltaConfig := &digest.Config{
+			Reader:       strings.NewReader(deltaCSV),
+			Key:          []int{0},
+			Separator:    ',',
+			Equivalences: eq,
+		}
+
+		actual, err := digest.Diff(*baseConfig, *deltaConfig)
+		assert.NoError(t, err)
+		assert.Len(t, actual.Additions, 1, "differing PKs should be treated as add+delete, not equivalence")
+		assert.Len(t, actual.Deletions, 1)
+	})
 }

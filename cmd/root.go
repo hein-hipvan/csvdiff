@@ -78,6 +78,8 @@ Most suitable for csv files created from database tables`,
 			runeSeparator,
 			lazyQuotes,
 			numericNormalize,
+			equalGroupsRaw,
+			equalIgnoreCase,
 		)
 
 		if err != nil {
@@ -129,6 +131,8 @@ var (
 	separator                  string
 	lazyQuotes                 bool
 	numericNormalize           bool
+	equalGroupsRaw             []string
+	equalIgnoreCase            bool
 )
 
 func init() {
@@ -144,6 +148,8 @@ func init() {
 	rootCmd.Flags().BoolVarP(&timed, "time", "", false, "Measure time")
 	rootCmd.Flags().BoolVar(&lazyQuotes, "lazyquotes", false, "allow unescaped quotes")
 	rootCmd.Flags().BoolVar(&numericNormalize, "numeric", false, "treat numerically-equal values as the same (e.g. 0 == 0.0); applies to value columns only")
+	rootCmd.Flags().StringArrayVar(&equalGroupsRaw, "equal", []string{}, "treat all values in a comma-separated group as equal. Repeat for multiple groups. Eg: --equal \"N/A,null,\" --equal \"yes,1,true\". Applies to value columns only.")
+	rootCmd.Flags().BoolVar(&equalIgnoreCase, "equal-ignore-case", false, "make --equal value matching case-insensitive")
 }
 
 func timeTrack(start time.Time, name string) {

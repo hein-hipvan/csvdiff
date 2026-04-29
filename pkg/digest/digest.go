@@ -19,17 +19,19 @@ type Digest struct {
 // CreateDigest creates a Digest for each line of csv.
 // There will be one Digest per line.
 //
-// When normalizeNumeric is true, cells used in the row digest are
-// canonicalized via normalizeNumericValue before hashing so that
-// numerically-equal strings (e.g. "0" and "0.0") produce the same value
-// hash. The primary-key hash and the returned Source slice always use
-// the original, unmodified cells.
-func CreateDigest(csv []string, separator string, pKey Positions, pRow Positions, normalizeNumeric bool) Digest {
+// When normalizeNumeric is true or equivalences is non-nil, cells used in
+// the row digest are canonicalized before hashing so that values the user
+// considers equal produce the same value hash. Numeric normalization runs
+// first (so e.g. "0.0" → "0"), then equivalence mapping (so a group like
+// ["0", "N/A"] still matches "0.0" with --numeric on). The primary-key
+// hash and the returned Source slice always use the original, unmodified
+// cells.
+func CreateDigest(csv []string, separator string, pKey Positions, pRow Positions, normalizeNumeric bool, equivalences *Equivalences) Digest {
 	key := xxhash.Sum64String(pKey.Join(csv, separator))
 
 	rowCells := csv
-	if normalizeNumeric {
-		rowCells = normalizedCellsForRow(csv, pRow)
+	if normalizeNumeric || equivalences != nil {
+		rowCells = normalizedCellsForRow(csv, pRow, normalizeNumeric, equivalences)
 	}
 	digest := xxhash.Sum64String(pRow.Join(rowCells, separator))
 
@@ -37,20 +39,27 @@ func CreateDigest(csv []string, separator string, pKey Positions, pRow Positions
 }
 
 // normalizedCellsForRow returns a shallow copy of csv with cells at the
-// row-digest positions replaced by their numeric-canonical form. When
-// pRow is empty, every cell is normalized (mirroring Positions.Join's
-// "all columns" semantics for an empty Positions).
-func normalizedCellsForRow(csv []string, pRow Positions) []string {
+// row-digest positions replaced by their canonical form. When pRow is
+// empty, every cell is normalized (mirroring Positions.Join's "all
+// columns" semantics for an empty Positions). Numeric normalization is
+// applied before equivalence mapping.
+func normalizedCellsForRow(csv []string, pRow Positions, normalizeNumeric bool, equivalences *Equivalences) []string {
 	out := make([]string, len(csv))
 	copy(out, csv)
+	transform := func(cell string) string {
+		if normalizeNumeric {
+			cell = normalizeNumericValue(cell)
+		}
+		return equivalences.Canonicalize(cell)
+	}
 	if len(pRow) == 0 {
 		for i := range out {
-			out[i] = normalizeNumericValue(out[i])
+			out[i] = transform(out[i])
 		}
 		return out
 	}
 	for _, pos := range pRow {
-		out[pos] = normalizeNumericValue(out[pos])
+		out[pos] = transform(out[pos])
 	}
 	return out
 }
@@ -119,7 +128,7 @@ func createDigestForNLines(lines [][]string,
 	output := make([]Digest, len(lines))
 	separator := string(config.Separator)
 	for i, line := range lines {
-		output[i] = CreateDigest(line, separator, config.Key, config.Value, config.NormalizeNumeric)
+		output[i] = CreateDigest(line, separator, config.Key, config.Value, config.NormalizeNumeric, config.Equivalences)
 	}
 
 	digestChannel <- output
