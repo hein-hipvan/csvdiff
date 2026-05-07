@@ -155,6 +155,8 @@ There are a number of formats supported
 % csvdiff base.csv delta.csv --equal "N/A,null," --equal-ignore-case
 ```
 
+- Multi-value cells (a single quoted field that packs multiple comma-separated tokens, e.g. `"68093,68863"`) are compared order-insensitively. The tokens are whitespace-trimmed and sorted before hashing — numerically when every token parses as a number (so `"10,2"` and `"2,10"` match), otherwise lexicographically. This always applies to value columns; primary-key columns are never canonicalized, and the original cell text is preserved in diff output.
+
 - Supports JSON format for post processing
 
 ```bash

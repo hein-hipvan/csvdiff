@@ -151,6 +151,50 @@ func TestCreateDigest_Equivalences(t *testing.T) {
 	})
 }
 
+func TestCreateDigest_MultivalueSorting(t *testing.T) {
+	t.Run("reordered comma-separated values hash equally", func(t *testing.T) {
+		base := digest.CreateDigest([]string{"1", "68863,68093"}, comma, []int{0}, []int{1}, false, nil)
+		delta := digest.CreateDigest([]string{"1", "68093,68863"}, comma, []int{0}, []int{1}, false, nil)
+
+		assert.Equal(t, base.Key, delta.Key)
+		assert.Equal(t, base.Value, delta.Value, "comma-separated values should hash equally regardless of order")
+	})
+
+	t.Run("whitespace within tokens trimmed before sort", func(t *testing.T) {
+		base := digest.CreateDigest([]string{"1", " 68863, 68093"}, comma, []int{0}, []int{1}, false, nil)
+		delta := digest.CreateDigest([]string{"1", "68093,68863"}, comma, []int{0}, []int{1}, false, nil)
+
+		assert.Equal(t, base.Value, delta.Value, "whitespace around tokens should be ignored")
+	})
+
+	t.Run("non-numeric tokens sort lexicographically", func(t *testing.T) {
+		base := digest.CreateDigest([]string{"1", "c,a,b"}, comma, []int{0}, []int{1}, false, nil)
+		delta := digest.CreateDigest([]string{"1", "b,a,c"}, comma, []int{0}, []int{1}, false, nil)
+
+		assert.Equal(t, base.Value, delta.Value, "string tokens should sort lexicographically")
+	})
+
+	t.Run("source slice preserves original cells", func(t *testing.T) {
+		line := []string{"1", "68863,68093"}
+		d := digest.CreateDigest(line, comma, []int{0}, []int{1}, false, nil)
+		assert.Equal(t, line, d.Source, "Source must keep original unsorted cells")
+	})
+
+	t.Run("primary key cells with commas are not canonicalized", func(t *testing.T) {
+		base := digest.CreateDigest([]string{"b,a", "x"}, comma, []int{0}, []int{1}, false, nil)
+		delta := digest.CreateDigest([]string{"a,b", "x"}, comma, []int{0}, []int{1}, false, nil)
+
+		assert.NotEqual(t, base.Key, delta.Key, "PK cells must not be sorted")
+	})
+
+	t.Run("cells without commas are unaffected", func(t *testing.T) {
+		line := []string{"1", "abc"}
+		got := digest.CreateDigest(line, comma, []int{0}, []int{1}, false, nil)
+		want := xxhash.Sum64String("abc")
+		assert.Equal(t, want, got.Value, "no-comma cells must hash to their raw bytes")
+	})
+}
+
 func TestNewConfig(t *testing.T) {
 	r := strings.NewReader("a,csv,as,str")
 	primaryColumns := digest.Positions{0}

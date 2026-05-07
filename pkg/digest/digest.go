@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"encoding/csv"
 	"runtime"
+	"strings"
 	"sync"
 
 	"github.com/cespare/xxhash"
@@ -20,20 +21,21 @@ type Digest struct {
 // CreateDigest creates a Digest for each line of csv.
 // There will be one Digest per line.
 //
-// When normalizeNumeric is true or equivalences is non-nil, cells used in
-// the row digest are canonicalized before hashing so that values the user
-// considers equal produce the same value hash. Numeric normalization runs
-// first (so e.g. "0.0" → "0"), then equivalence mapping (so a group like
-// ["0", "N/A"] still matches "0.0" with --numeric on). The primary-key
-// hash and the returned Source slice always use the original, unmodified
-// cells.
+// Cells used in the row digest are canonicalized before hashing so values
+// the user considers equal produce the same value hash. The transform
+// chain on each value cell is: comma-separated multi-value cells are
+// sorted (numerically when every whitespace-trimmed token parses as a
+// float, else lexicographically) so that "68863,68093" matches
+// "68093,68863"; then, when normalizeNumeric is true, single-number
+// cells are canonicalized (so e.g. "0.0" → "0"); then, when equivalences
+// is non-nil, equivalence groups are applied (so a group like
+// ["0", "N/A"] still matches "0.0" with --numeric on). Multi-value
+// canonicalization always runs. The primary-key hash and the returned
+// Source slice always use the original, unmodified cells.
 func CreateDigest(csv []string, separator string, pKey Positions, pRow Positions, normalizeNumeric bool, equivalences *Equivalences) Digest {
 	key := xxhash.Sum64String(pKey.Join(csv, separator))
 
-	rowCells := csv
-	if normalizeNumeric || equivalences != nil {
-		rowCells = normalizedCellsForRow(csv, pRow, normalizeNumeric, equivalences)
-	}
+	rowCells := normalizedCellsForRow(csv, pRow, normalizeNumeric, equivalences)
 	digest := xxhash.Sum64String(pRow.Join(rowCells, separator))
 
 	return Digest{Key: key, Value: digest, Source: csv}
@@ -64,12 +66,19 @@ func mixOccurrence(key uint64, occurrence uint32) uint64 {
 // normalizedCellsForRow returns a shallow copy of csv with cells at the
 // row-digest positions replaced by their canonical form. When pRow is
 // empty, every cell is normalized (mirroring Positions.Join's "all
-// columns" semantics for an empty Positions). Numeric normalization is
-// applied before equivalence mapping.
+// columns" semantics for an empty Positions). Multi-value cells (those
+// containing a comma) are sorted; numeric normalization runs next; then
+// equivalence mapping. When no transformation would apply (no comma in
+// any value cell, normalizeNumeric off, equivalences nil), csv is
+// returned directly without copying.
 func normalizedCellsForRow(csv []string, pRow Positions, normalizeNumeric bool, equivalences *Equivalences) []string {
+	if !normalizeNumeric && equivalences == nil && !anyValueCellHasComma(csv, pRow) {
+		return csv
+	}
 	out := make([]string, len(csv))
 	copy(out, csv)
 	transform := func(cell string) string {
+		cell = sortMultivalueCell(cell)
 		if normalizeNumeric {
 			cell = normalizeNumericValue(cell)
 		}
@@ -85,6 +94,23 @@ func normalizedCellsForRow(csv []string, pRow Positions, normalizeNumeric bool, 
 		out[pos] = transform(out[pos])
 	}
 	return out
+}
+
+func anyValueCellHasComma(csv []string, pRow Positions) bool {
+	if len(pRow) == 0 {
+		for _, c := range csv {
+			if strings.IndexByte(c, ',') >= 0 {
+				return true
+			}
+		}
+		return false
+	}
+	for _, pos := range pRow {
+		if pos >= 0 && pos < len(csv) && strings.IndexByte(csv[pos], ',') >= 0 {
+			return true
+		}
+	}
+	return false
 }
 
 const bufferSize = 512
