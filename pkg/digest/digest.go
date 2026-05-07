@@ -1,6 +1,7 @@
 package digest
 
 import (
+	"encoding/binary"
 	"encoding/csv"
 	"runtime"
 	"sync"
@@ -36,6 +37,28 @@ func CreateDigest(csv []string, separator string, pKey Positions, pRow Positions
 	digest := xxhash.Sum64String(pRow.Join(rowCells, separator))
 
 	return Digest{Key: key, Value: digest, Source: csv}
+}
+
+// CreateDigestWithOccurrence is like CreateDigest but mixes a per-file
+// occurrence index into the resulting Key. This lets duplicate primary
+// keys be distinguished: the Nth occurrence of a primary key in base is
+// matched against the Nth occurrence in delta.
+//
+// The mix uses xxhash over [origKey 8 LE bytes][0x00][occurrence 4 LE bytes]
+// rather than string concatenation, so it cannot collide with user-supplied
+// key content.
+func CreateDigestWithOccurrence(csv []string, separator string, pKey Positions, pRow Positions, occurrence uint32, normalizeNumeric bool, equivalences *Equivalences) Digest {
+	d := CreateDigest(csv, separator, pKey, pRow, normalizeNumeric, equivalences)
+	d.Key = mixOccurrence(d.Key, occurrence)
+	return d
+}
+
+func mixOccurrence(key uint64, occurrence uint32) uint64 {
+	var buf [13]byte
+	binary.LittleEndian.PutUint64(buf[0:8], key)
+	buf[8] = 0x00
+	binary.LittleEndian.PutUint32(buf[9:13], occurrence)
+	return xxhash.Sum64(buf[:])
 }
 
 // normalizedCellsForRow returns a shallow copy of csv with cells at the

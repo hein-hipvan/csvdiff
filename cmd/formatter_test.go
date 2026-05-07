@@ -224,6 +224,81 @@ func TestWordDiff(t *testing.T) {
 		assert.Equal(t, expectedStderr, stderr.String())
 
 	})
+
+	t.Run("should not panic when include length exceeds row length", func(t *testing.T) {
+		diff := digest.Differences{
+			Modifications: []digest.Modification{
+				{Original: []string{"original"}, Current: []string{"modification"}},
+			},
+		}
+
+		var stdout bytes.Buffer
+		var stderr bytes.Buffer
+
+		formatter := NewFormatter(&stdout, &stderr, Context{
+			format:                 "word-diff",
+			includeColumnPositions: digest.Positions{0, 0, 0},
+		})
+
+		err := formatter.Format(diff)
+
+		assert.NoError(t, err)
+		assert.Equal(t, "[-original-]{+modification+},[-original-]{+modification+},[-original-]{+modification+}\n", stdout.String())
+	})
+
+	t.Run("should not panic when Original is shorter than Current", func(t *testing.T) {
+		diff := digest.Differences{
+			Modifications: []digest.Modification{
+				{Original: []string{"a"}, Current: []string{"a", "b"}},
+			},
+		}
+
+		var stdout bytes.Buffer
+		var stderr bytes.Buffer
+
+		formatter := NewFormatter(&stdout, &stderr, Context{format: "word-diff"})
+
+		err := formatter.Format(diff)
+
+		assert.NoError(t, err)
+		assert.Equal(t, "a,[--]{+b+}\n", stdout.String())
+	})
+
+	t.Run("should not panic when Current is shorter than Original", func(t *testing.T) {
+		diff := digest.Differences{
+			Modifications: []digest.Modification{
+				{Original: []string{"a", "b"}, Current: []string{"a"}},
+			},
+		}
+
+		var stdout bytes.Buffer
+		var stderr bytes.Buffer
+
+		formatter := NewFormatter(&stdout, &stderr, Context{format: "word-diff"})
+
+		err := formatter.Format(diff)
+
+		assert.NoError(t, err)
+		assert.Equal(t, "a,[-b-]{++}\n", stdout.String())
+	})
+
+	t.Run("should not panic when Original is empty", func(t *testing.T) {
+		diff := digest.Differences{
+			Modifications: []digest.Modification{
+				{Original: []string{}, Current: []string{"a", "b"}},
+			},
+		}
+
+		var stdout bytes.Buffer
+		var stderr bytes.Buffer
+
+		formatter := NewFormatter(&stdout, &stderr, Context{format: "word-diff"})
+
+		err := formatter.Format(diff)
+
+		assert.NoError(t, err)
+		assert.Equal(t, "[--]{+a+},[--]{+b+}\n", stdout.String())
+	})
 }
 
 func TestColorWords(t *testing.T) {

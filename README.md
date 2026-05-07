@@ -131,6 +131,17 @@ There are a number of formats supported
 % csvdiff base.csv delta.csv --primary-key 0,1 --columns 2
 ```
 
+- Allow duplicate primary keys with `--allow-duplicate-keys`. Without this flag, duplicate primary keys silently overwrite each other in csvdiff's internal map, which causes unrelated rows to be paired up as a single modification. With the flag, the Nth occurrence of a primary key in base is matched against the Nth occurrence in delta:
+
+```bash
+# base.csv:    a,1 / a,2 / a,3
+# delta.csv:   a,1 / a,9 / a,3
+% csvdiff base.csv delta.csv --allow-duplicate-keys
+# reports exactly one modification: 2 → 9
+```
+
+  Caveat: with this flag and an empty/non-unique primary key, every row gets a distinct effective key, which degenerates into a positional row-by-row diff. Use a meaningful `--primary-key` for best results.
+
 - Treat user-defined values as equal during comparison. Pass `--equal` once per group of mutually-equal values; repeat the flag for additional groups. The first member of a group is the canonical form. Empty strings can be included via a trailing comma. Only value columns are affected — primary-key columns are never canonicalized.
 
 ```bash

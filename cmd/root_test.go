@@ -47,6 +47,7 @@ func TestRunContext(t *testing.T) {
 			false,
 			nil,
 			false,
+			false,
 		)
 		assert.NoError(t, err)
 
@@ -100,6 +101,7 @@ func TestRunContext(t *testing.T) {
 			false,
 			false,
 			[]string{"N/A,null,"},
+			false,
 			false,
 		)
 		assert.NoError(t, err)

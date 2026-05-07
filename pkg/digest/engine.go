@@ -4,6 +4,8 @@ import (
 	"encoding/csv"
 	"runtime"
 	"sync"
+
+	"github.com/cespare/xxhash"
 )
 
 // Engine to create a FileDigest
@@ -61,6 +63,11 @@ func (e Engine) StreamDigests() (chan []Digest, chan error) {
 		reader := csv.NewReader(e.config.Reader)
 		reader.Comma = e.config.Separator
 		reader.LazyQuotes = e.config.LazyQuotes
+		separator := string(e.config.Separator)
+		var occCounts map[uint64]uint32
+		if e.config.AllowDuplicateKeys {
+			occCounts = make(map[uint64]uint32)
+		}
 		for {
 			lines, eofReached, err := getNextNLines(reader)
 
@@ -72,8 +79,18 @@ func (e Engine) StreamDigests() (chan []Digest, chan error) {
 				return
 			}
 
+			var occurrences []uint32
+			if e.config.AllowDuplicateKeys {
+				occurrences = make([]uint32, len(lines))
+				for i, line := range lines {
+					origKey := xxhash.Sum64String(e.config.Key.Join(line, separator))
+					occurrences[i] = occCounts[origKey]
+					occCounts[origKey]++
+				}
+			}
+
 			wg.Add(1)
-			go e.digestForLines(lines, digestChannel, wg)
+			go e.digestForLines(lines, occurrences, digestChannel, wg)
 
 			if eofReached {
 				break
@@ -89,11 +106,15 @@ func (e Engine) StreamDigests() (chan []Digest, chan error) {
 
 }
 
-func (e Engine) digestForLines(lines [][]string, digestChannel chan []Digest, wg *sync.WaitGroup) {
+func (e Engine) digestForLines(lines [][]string, occurrences []uint32, digestChannel chan []Digest, wg *sync.WaitGroup) {
 	output := make([]Digest, 0, len(lines))
 	separator := string(e.config.Separator)
-	for _, line := range lines {
-		output = append(output, CreateDigest(line, separator, e.config.Key, e.config.Value, e.config.NormalizeNumeric, e.config.Equivalences))
+	for i, line := range lines {
+		if e.config.AllowDuplicateKeys {
+			output = append(output, CreateDigestWithOccurrence(line, separator, e.config.Key, e.config.Value, occurrences[i], e.config.NormalizeNumeric, e.config.Equivalences))
+		} else {
+			output = append(output, CreateDigest(line, separator, e.config.Key, e.config.Value, e.config.NormalizeNumeric, e.config.Equivalences))
+		}
 	}
 
 	digestChannel <- output

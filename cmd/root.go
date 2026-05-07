@@ -80,6 +80,7 @@ Most suitable for csv files created from database tables`,
 			numericNormalize,
 			equalGroupsRaw,
 			equalIgnoreCase,
+			allowDuplicateKeys,
 		)
 
 		if err != nil {
@@ -133,6 +134,7 @@ var (
 	numericNormalize           bool
 	equalGroupsRaw             []string
 	equalIgnoreCase            bool
+	allowDuplicateKeys         bool
 )
 
 func init() {
@@ -150,6 +152,7 @@ func init() {
 	rootCmd.Flags().BoolVar(&numericNormalize, "numeric", false, "treat numerically-equal values as the same (e.g. 0 == 0.0); applies to value columns only")
 	rootCmd.Flags().StringArrayVar(&equalGroupsRaw, "equal", []string{}, "treat all values in a comma-separated group as equal. Repeat for multiple groups. Eg: --equal \"N/A,null,\" --equal \"yes,1,true\". Applies to value columns only.")
 	rootCmd.Flags().BoolVar(&equalIgnoreCase, "equal-ignore-case", false, "make --equal value matching case-insensitive")
+	rootCmd.Flags().BoolVar(&allowDuplicateKeys, "allow-duplicate-keys", false, "match duplicate primary keys positionally: 1st occurrence of a key in base matches 1st in delta, 2nd matches 2nd, etc. Without this flag, duplicate keys silently overwrite each other.")
 }
 
 func timeTrack(start time.Time, name string) {

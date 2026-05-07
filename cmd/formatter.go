@@ -223,9 +223,6 @@ func (f *Formatter) colorWords(diff digest.Differences) error {
 
 func (f *Formatter) wordLevelDiffs(diff digest.Differences, deletionFormat, additionFormat string) error {
 	includes := f.ctx.GetIncludeColumnPositions()
-	if len(includes) <= 0 {
-		includes = f.ctx.GetValueColumns()
-	}
 	blue := color.New(color.FgBlue).SprintfFunc()
 	red := color.New(color.FgRed).SprintfFunc()
 	green := color.New(color.FgGreen).SprintfFunc()
@@ -237,14 +234,25 @@ func (f *Formatter) wordLevelDiffs(diff digest.Differences, deletionFormat, addi
 
 	_, _ = fmt.Fprintln(f.stderr, blue("# Modifications (%d)", len(diff.Modifications)))
 	for _, modification := range diff.Modifications {
-		result := make([]string, 0, len(modification.Current))
-		for i := 0; i < len(includes) || i < len(modification.Current); i++ {
-			if modification.Original[i] != modification.Current[i] {
-				removed := red(deletionFormat, modification.Original[i])
-				added := green(additionFormat, modification.Current[i])
+		length := len(modification.Current)
+		if len(modification.Original) > length {
+			length = len(modification.Original)
+		}
+		result := make([]string, 0, length)
+		for i := 0; i < length; i++ {
+			var orig, curr string
+			if i < len(modification.Original) {
+				orig = modification.Original[i]
+			}
+			if i < len(modification.Current) {
+				curr = modification.Current[i]
+			}
+			if orig != curr {
+				removed := red(deletionFormat, orig)
+				added := green(additionFormat, curr)
 				result = append(result, fmt.Sprintf("%s%s", removed, added))
 			} else {
-				result = append(result, modification.Current[i])
+				result = append(result, curr)
 			}
 		}
 		_, _ = fmt.Fprintln(f.stdout, includes.String(result, f.ctx.separator))

@@ -209,3 +209,197 @@ func TestDiff(t *testing.T) {
 		assert.Len(t, actual.Deletions, 1)
 	})
 }
+
+func TestDiff_AllowDuplicateKeys(t *testing.T) {
+	t.Run("identical duplicates in both files produce no differences", func(t *testing.T) {
+		csv := "a,1\na,2\na,3\n"
+
+		baseConfig := digest.Config{
+			Reader:             strings.NewReader(csv),
+			Key:                []int{0},
+			Separator:          ',',
+			AllowDuplicateKeys: true,
+		}
+		deltaConfig := digest.Config{
+			Reader:             strings.NewReader(csv),
+			Key:                []int{0},
+			Separator:          ',',
+			AllowDuplicateKeys: true,
+		}
+
+		actual, err := digest.Diff(baseConfig, deltaConfig)
+		assert.NoError(t, err)
+		assert.Empty(t, actual.Additions)
+		assert.Empty(t, actual.Modifications)
+		assert.Empty(t, actual.Deletions)
+	})
+
+	t.Run("modifying the 2nd of three duplicates yields one modification with correct pairing", func(t *testing.T) {
+		base := "a,1\na,2\na,3\n"
+		delta := "a,1\na,9\na,3\n"
+
+		baseConfig := digest.Config{
+			Reader:             strings.NewReader(base),
+			Key:                []int{0},
+			Separator:          ',',
+			AllowDuplicateKeys: true,
+		}
+		deltaConfig := digest.Config{
+			Reader:             strings.NewReader(delta),
+			Key:                []int{0},
+			Separator:          ',',
+			AllowDuplicateKeys: true,
+		}
+
+		actual, err := digest.Diff(baseConfig, deltaConfig)
+		assert.NoError(t, err)
+		assert.Empty(t, actual.Additions)
+		assert.Empty(t, actual.Deletions)
+		assert.Len(t, actual.Modifications, 1)
+		assert.Equal(t, []string{"a", "2"}, actual.Modifications[0].Original)
+		assert.Equal(t, []string{"a", "9"}, actual.Modifications[0].Current)
+	})
+
+	t.Run("an extra duplicate in delta is reported as addition not modification", func(t *testing.T) {
+		base := "a,1\na,2\n"
+		delta := "a,1\na,2\na,3\n"
+
+		baseConfig := digest.Config{
+			Reader:             strings.NewReader(base),
+			Key:                []int{0},
+			Separator:          ',',
+			AllowDuplicateKeys: true,
+		}
+		deltaConfig := digest.Config{
+			Reader:             strings.NewReader(delta),
+			Key:                []int{0},
+			Separator:          ',',
+			AllowDuplicateKeys: true,
+		}
+
+		actual, err := digest.Diff(baseConfig, deltaConfig)
+		assert.NoError(t, err)
+		assert.Empty(t, actual.Modifications)
+		assert.Empty(t, actual.Deletions)
+		assert.Len(t, actual.Additions, 1)
+		assert.Equal(t, digest.Addition{"a", "3"}, actual.Additions[0])
+	})
+
+	t.Run("a missing duplicate in delta is reported as deletion not modification", func(t *testing.T) {
+		base := "a,1\na,2\na,3\n"
+		delta := "a,1\na,2\n"
+
+		baseConfig := digest.Config{
+			Reader:             strings.NewReader(base),
+			Key:                []int{0},
+			Separator:          ',',
+			AllowDuplicateKeys: true,
+		}
+		deltaConfig := digest.Config{
+			Reader:             strings.NewReader(delta),
+			Key:                []int{0},
+			Separator:          ',',
+			AllowDuplicateKeys: true,
+		}
+
+		actual, err := digest.Diff(baseConfig, deltaConfig)
+		assert.NoError(t, err)
+		assert.Empty(t, actual.Additions)
+		assert.Empty(t, actual.Modifications)
+		assert.Len(t, actual.Deletions, 1)
+		assert.Equal(t, digest.Deletion{"a", "3"}, actual.Deletions[0])
+	})
+
+	t.Run("flag off with duplicates produces wrong pairing (regression guard)", func(t *testing.T) {
+		base := "a,1\na,2\na,3\n"
+		delta := "a,1\na,9\na,3\n"
+
+		baseConfig := digest.Config{
+			Reader:    strings.NewReader(base),
+			Key:       []int{0},
+			Separator: ',',
+		}
+		deltaConfig := digest.Config{
+			Reader:    strings.NewReader(delta),
+			Key:       []int{0},
+			Separator: ',',
+		}
+
+		actual, err := digest.Diff(baseConfig, deltaConfig)
+		assert.NoError(t, err)
+		// Without --allow-duplicate-keys, duplicates silently overwrite each
+		// other in the digest map. The resulting diff is NOT what the flag-on
+		// test produced (single mod 2 → 9). Confirm the buggy default still
+		// reports something different so we'd notice if defaults change.
+		clean := actual.Modifications != nil &&
+			len(actual.Modifications) == 1 &&
+			len(actual.Modifications[0].Original) == 2 &&
+			actual.Modifications[0].Original[1] == "2" &&
+			len(actual.Modifications[0].Current) == 2 &&
+			actual.Modifications[0].Current[1] == "9"
+		assert.False(t, clean, "without --allow-duplicate-keys, duplicates should NOT produce the cleanly-paired modification")
+	})
+
+	t.Run("flag on with no duplicates matches flag-off behavior", func(t *testing.T) {
+		base := "1,a\n2,b\n3,c\n"
+		delta := "1,a\n2,B\n4,d\n"
+
+		makeConfigs := func(allow bool) (digest.Config, digest.Config) {
+			return digest.Config{
+					Reader:             strings.NewReader(base),
+					Key:                []int{0},
+					Separator:          ',',
+					AllowDuplicateKeys: allow,
+				}, digest.Config{
+					Reader:             strings.NewReader(delta),
+					Key:                []int{0},
+					Separator:          ',',
+					AllowDuplicateKeys: allow,
+				}
+		}
+
+		off, err := digest.Diff(makeConfigs(false))
+		assert.NoError(t, err)
+		on, err := digest.Diff(makeConfigs(true))
+		assert.NoError(t, err)
+
+		assert.ElementsMatch(t, off.Additions, on.Additions)
+		assert.ElementsMatch(t, off.Modifications, on.Modifications)
+		assert.ElementsMatch(t, off.Deletions, on.Deletions)
+	})
+
+	t.Run("repeated runs produce identical effective keys despite worker concurrency", func(t *testing.T) {
+		var b strings.Builder
+		for i := 0; i < 2000; i++ {
+			b.WriteString("a,row\n")
+		}
+		csv := b.String()
+
+		run := func() digest.Differences {
+			baseConfig := digest.Config{
+				Reader:             strings.NewReader(csv),
+				Key:                []int{0},
+				Separator:          ',',
+				AllowDuplicateKeys: true,
+			}
+			deltaConfig := digest.Config{
+				Reader:             strings.NewReader(csv),
+				Key:                []int{0},
+				Separator:          ',',
+				AllowDuplicateKeys: true,
+			}
+			d, err := digest.Diff(baseConfig, deltaConfig)
+			assert.NoError(t, err)
+			return d
+		}
+
+		first := run()
+		for i := 0; i < 5; i++ {
+			next := run()
+			assert.Empty(t, next.Additions)
+			assert.Empty(t, next.Modifications)
+			assert.Empty(t, next.Deletions)
+			assert.Equal(t, first, next)
+		}
+	})
+}

@@ -51,6 +51,7 @@ func TestPrimaryKeyPositions(t *testing.T) {
 				false,
 				nil,
 				false,
+				false,
 			)
 			assert.NoError(t, err)
 			assert.Equal(t, tt.out, ctx.GetPrimaryKeys())
@@ -99,6 +100,7 @@ func TestValueColumnPositions(t *testing.T) {
 				false,
 				nil,
 				false,
+				false,
 			)
 			assert.NoError(t, err)
 			assert.Equal(t, tt.out, ctx.GetValueColumns())
@@ -129,6 +131,7 @@ func TestNewContext(t *testing.T) {
 				false,
 				nil,
 				false,
+				false,
 			)
 
 			assert.EqualError(t, err, "validation failed: specified format is not valid")
@@ -149,6 +152,7 @@ func TestNewContext(t *testing.T) {
 				false,
 				nil,
 				false,
+				false,
 			)
 
 			assert.NoError(t, err)
@@ -168,6 +172,7 @@ func TestNewContext(t *testing.T) {
 				false,
 				false,
 				nil,
+				false,
 				false,
 			)
 
@@ -191,6 +196,7 @@ func TestNewContext(t *testing.T) {
 			false,
 			false,
 			nil,
+			false,
 			false,
 		)
 		assert.EqualError(t, err, "error in base-file: open "+string(os.PathSeparator)+"base.csv: file does not exist")
@@ -217,6 +223,7 @@ func TestNewContext(t *testing.T) {
 			false,
 			nil,
 			false,
+			false,
 		)
 		assert.EqualError(t, err, "error in base-file: unable to process headers from csv file. EOF reached. invalid CSV file")
 	})
@@ -242,6 +249,7 @@ func TestNewContext(t *testing.T) {
 			false,
 			nil,
 			false,
+			false,
 		)
 		assert.EqualError(t, err, "error in delta-file: unable to process headers from csv file. EOF reached. invalid CSV file")
 	})
@@ -263,6 +271,7 @@ func TestNewContext(t *testing.T) {
 			false,
 			false,
 			nil,
+			false,
 			false,
 		)
 		assert.NoError(t, err)
@@ -296,6 +305,7 @@ func TestNewContext(t *testing.T) {
 				false,
 				nil,
 				false,
+				false,
 			)
 
 			assert.EqualError(t, err, "validation failed: --primary-key positions are out of bounds")
@@ -316,6 +326,7 @@ func TestNewContext(t *testing.T) {
 				false,
 				nil,
 				false,
+				false,
 			)
 
 			assert.EqualError(t, err, "validation failed: --include positions are out of bounds")
@@ -335,6 +346,7 @@ func TestNewContext(t *testing.T) {
 				false,
 				false,
 				nil,
+				false,
 				false,
 			)
 
@@ -362,6 +374,7 @@ func TestNewContext(t *testing.T) {
 				false,
 				nil,
 				false,
+				false,
 			)
 			assert.EqualError(t, err, "base-file and delta-file columns count do not match")
 		})
@@ -384,6 +397,7 @@ func TestNewContext(t *testing.T) {
 			false,
 			false,
 			nil,
+			false,
 			false,
 		)
 
@@ -412,6 +426,7 @@ func TestConfig_DigestConfig(t *testing.T) {
 			false,
 			false,
 			nil,
+			false,
 			false,
 		)
 		assert.NoError(t, err)
@@ -451,6 +466,7 @@ func TestConfig_DigestConfig(t *testing.T) {
 			false,
 			false,
 			nil,
+			false,
 			false,
 		)
 		assert.NoError(t, err)

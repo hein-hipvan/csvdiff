@@ -27,6 +27,7 @@ type Context struct {
 	lazyQuotes             bool
 	normalizeNumeric       bool
 	equivalences           *digest.Equivalences
+	allowDuplicateKeys     bool
 }
 
 // NewContext can take all CLI flags and create a cmd.Context
@@ -46,6 +47,7 @@ func NewContext(
 	normalizeNumeric bool,
 	equalGroupsRaw []string,
 	equalIgnoreCase bool,
+	allowDuplicateKeys bool,
 ) (*Context, error) {
 	baseRecordCount, err := getColumnsCount(fs, baseFilename, separator, lazyQuotes)
 	if err != nil {
@@ -91,6 +93,7 @@ func NewContext(
 		lazyQuotes:             lazyQuotes,
 		normalizeNumeric:       normalizeNumeric,
 		equivalences:           digest.NewEquivalences(parseEqualGroups(equalGroupsRaw), equalIgnoreCase),
+		allowDuplicateKeys:     allowDuplicateKeys,
 	}
 
 	if err := ctx.validate(); err != nil {
@@ -212,14 +215,15 @@ func getColumnsCount(fs afero.Fs, filename string, separator rune, lazyQuotes bo
 // that is needed to start the diff process
 func (c *Context) BaseDigestConfig() (digest.Config, error) {
 	return digest.Config{
-		Reader:           c.baseFile,
-		Value:            c.valueColumnPositions,
-		Key:              c.primaryKeyPositions,
-		Include:          c.includeColumnPositions,
-		Separator:        c.separator,
-		LazyQuotes:       c.lazyQuotes,
-		NormalizeNumeric: c.normalizeNumeric,
-		Equivalences:     c.equivalences,
+		Reader:             c.baseFile,
+		Value:              c.valueColumnPositions,
+		Key:                c.primaryKeyPositions,
+		Include:            c.includeColumnPositions,
+		Separator:          c.separator,
+		LazyQuotes:         c.lazyQuotes,
+		NormalizeNumeric:   c.normalizeNumeric,
+		Equivalences:       c.equivalences,
+		AllowDuplicateKeys: c.allowDuplicateKeys,
 	}, nil
 }
 
@@ -227,14 +231,15 @@ func (c *Context) BaseDigestConfig() (digest.Config, error) {
 // that is needed to start the diff process
 func (c *Context) DeltaDigestConfig() (digest.Config, error) {
 	return digest.Config{
-		Reader:           c.deltaFile,
-		Value:            c.valueColumnPositions,
-		Key:              c.primaryKeyPositions,
-		Include:          c.includeColumnPositions,
-		Separator:        c.separator,
-		LazyQuotes:       c.lazyQuotes,
-		NormalizeNumeric: c.normalizeNumeric,
-		Equivalences:     c.equivalences,
+		Reader:             c.deltaFile,
+		Value:              c.valueColumnPositions,
+		Key:                c.primaryKeyPositions,
+		Include:            c.includeColumnPositions,
+		Separator:          c.separator,
+		LazyQuotes:         c.lazyQuotes,
+		NormalizeNumeric:   c.normalizeNumeric,
+		Equivalences:       c.equivalences,
+		AllowDuplicateKeys: c.allowDuplicateKeys,
 	}, nil
 }
 
